@@ -5,6 +5,8 @@
 #include "detector_for_roi.hpp"
 #include "yolov2_caffe_detector.hpp"
 #include "yolov2_caffe_decoder.hpp"
+#include "nms_rect.hpp"
+#include "nms_distance_rect.hpp"
 #include "threshold_and_nms.hpp"
 
 #include <memory>
@@ -28,7 +30,7 @@ std::shared_ptr<STLDetector> STLDetectorFactory(
     const AnchorWInIterT& anchor_weight_end,
     const cv::Size2f& grid_cell_size,
     const ROIInIterT& roi_beg, const ROIInIterT& roi_end,
-    float conf_thresh, float nms_overlap, float nms_range);
+    float conf_thresh, float nms_overlap, float nms_dist_mult);
 
 std::shared_ptr<STLDetector> BoschDetectorFactory(
     const std::string& caffe_net, const std::string& caffe_model,
@@ -51,7 +53,7 @@ std::shared_ptr<STLDetector> STLDetectorFactory(
     const AnchorWInIterT& anchor_weight_end,
     const cv::Size2f& grid_cell_size,
     const ROIInIterT& roi_beg, const ROIInIterT& roi_end,
-    float conf_thresh, float nms_overlap, float nms_range) {
+    float conf_thresh, float nms_overlap, float nms_dist_mult) {
   CaffeWrapper<float>* caffe = 
       new CaffeWrapper<float>(caffe_net, caffe_model, use_gpu);
 
@@ -63,9 +65,11 @@ std::shared_ptr<STLDetector> STLDetectorFactory(
   YOLOV2CaffeDetector<float>* yolov2_detector = 
       new YOLOV2CaffeDetector<float>(caffe, yolov2_decoder);
 
-  // TO DO : NMS 구현 후 nullptr을 NMS 객체로 대체할 것
+  NMSRect<float, float>* nms = new NMSRect<float, float>(nms_overlap);
+  NMSDistanceRect<float, float>* dist_nms =
+      new NMSDistanceRect<float, float>(nms, nms_dist_mult);
   DetectionFilter<TL> filter = 
-      new ThresholdAndNMS<TL>(conf_thresh, nullptr);
+      new ThresholdAndNMS<TL>(conf_thresh, dist_nms);
 
   STLDetector* stl_detector = 
       new STLDetector(yolov2_detector, roi_beg, roi_end, filter, true);
